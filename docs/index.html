@@ -1,0 +1,1376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The complete MidiMesh user manual — nodes and mesh security, routing, translation tables, HTTP/OSC/RossTalk gateways, monitoring, and backups. Written for live-production volunteers.">
+<meta name="color-scheme" content="light">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%230A6E74'/%3E%3Ccircle%20cx='16'%20cy='16'%20r='6'%20fill='none'%20stroke='%23EAF0EE'%20stroke-width='2.4'/%3E%3Ccircle%20cx='16'%20cy='16'%20r='2'%20fill='%2312A29A'/%3E%3C/svg%3E">
+<title>MidiMesh User Manual</title>
+<style>
+  :root{
+    --paper:#EEF2F0;
+    --paper-raised:#F9FBFA;
+    --ink:#14181A;
+    --ink-soft:#566065;
+    --line:#D2DBD7;
+    --line-strong:#BCC7C2;
+    --accent:#0A6E74;
+    --accent-bright:#12A29A;
+    --signal:#A85E0C;
+    --screen:#0F151A;
+    --screen-ink:#CBD8D3;
+    --screen-dim:#6E8079;
+    --st-available:#9AA7A3;
+    --st-active:#2E9E5B;
+    --st-connected:#0A8E96;
+    --st-merged:#7C5AC2;
+    --st-pending:#C79A2E;
+    --st-error:#C0463C;
+    --mono: ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code","Roboto Mono",Menlo,Consolas,monospace;
+    --serif: "Iowan Old Style","Charter","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --measure: 68ch;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--serif);
+    font-size:17px;
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  ::selection{background:rgba(10,110,116,.18)}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(10,110,116,.28);transition:color .15s,border-color .15s}
+  a:hover{color:var(--accent-bright);border-color:var(--accent-bright)}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+  /* ---------- Masthead ---------- */
+  .masthead{
+    position:relative;
+    overflow:hidden;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#EAF0EE 0%,var(--paper) 100%);
+  }
+  #mesh{position:absolute;inset:0;width:100%;height:100%;opacity:.62;pointer-events:none}
+  .masthead-inner{
+    position:relative;z-index:1;
+    max-width:1180px;margin:0 auto;
+    padding:clamp(2.4rem,6vw,4.6rem) clamp(1.2rem,4vw,2.6rem) clamp(2rem,4vw,3.2rem);
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--accent);font-weight:600;margin:0 0 1.1rem;
+    display:flex;align-items:center;gap:.7rem;
+  }
+  .eyebrow::before{content:"";width:26px;height:1px;background:var(--accent);display:inline-block}
+  .wordmark{
+    font-family:var(--mono);
+    font-weight:600;
+    font-size:clamp(2.7rem,8vw,5.1rem);
+    letter-spacing:-.04em;
+    line-height:.96;
+    margin:0;
+    color:var(--ink);
+    text-wrap:balance;
+  }
+  .wordmark .mesh-half{color:var(--accent)}
+  .tagline{
+    font-family:var(--serif);font-style:italic;
+    font-size:clamp(1.05rem,2.4vw,1.4rem);
+    color:var(--ink-soft);
+    margin:1.1rem 0 0;max-width:34ch;line-height:1.4;
+  }
+  .chips{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.8rem}
+  .chip{
+    font-family:var(--mono);font-size:.72rem;letter-spacing:.04em;
+    color:var(--ink-soft);
+    background:var(--paper-raised);
+    border:1px solid var(--line-strong);
+    border-radius:999px;
+    padding:.34rem .8rem;
+    display:inline-flex;align-items:center;gap:.45rem;
+  }
+  .chip b{color:var(--accent);font-weight:600}
+  .chip .led{width:7px;height:7px;border-radius:50%;background:var(--accent-bright);box-shadow:0 0 0 3px rgba(18,162,154,.16)}
+
+  /* ---------- Shell / layout ---------- */
+  .shell{
+    max-width:1180px;margin:0 auto;
+    padding:clamp(2rem,4vw,3.4rem) clamp(1.2rem,4vw,2.6rem) 4rem;
+    display:grid;grid-template-columns:236px minmax(0,1fr);
+    gap:clamp(2rem,5vw,4.2rem);
+    align-items:start;
+  }
+  .toc{position:sticky;top:1.6rem;font-family:var(--mono)}
+  .toc h2{
+    font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:600;margin:0 0 1rem;padding-left:.1rem;
+  }
+  .toc ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.15rem}
+  .toc a{
+    display:flex;gap:.7rem;align-items:baseline;
+    font-size:.82rem;line-height:1.35;
+    color:var(--ink-soft);
+    border:0;border-left:2px solid transparent;
+    padding:.42rem .3rem .42rem .75rem;
+    border-radius:0 4px 4px 0;
+    transition:color .15s,background .15s,border-color .15s;
+  }
+  .toc a .n{color:var(--accent);font-size:.72rem;font-weight:600;min-width:1.4em;font-variant-numeric:tabular-nums}
+  .toc a:hover{background:rgba(10,110,116,.06);color:var(--ink)}
+  .toc a.on{color:var(--ink);border-left-color:var(--accent);background:rgba(10,110,116,.07)}
+  .toc a.on .n{color:var(--accent-bright)}
+
+  /* ---------- Document ---------- */
+  .doc{min-width:0;max-width:var(--measure)}
+  .doc>*{margin-inline:0}
+  .doc p,.doc li{overflow-wrap:break-word}
+  .doc p{margin:0 0 1.05rem}
+  .doc p.lead{font-size:1.24rem;line-height:1.5;color:var(--ink);margin-bottom:1.3rem}
+  .doc p.lead:first-of-type{font-size:1.32rem}
+  .doc p.lead strong{color:var(--ink)}
+
+  .doc h2{
+    font-family:var(--mono);font-weight:600;
+    font-size:clamp(1.5rem,3.5vw,1.95rem);
+    letter-spacing:-.02em;line-height:1.12;
+    color:var(--ink);
+    margin:1.2rem 0 1.1rem;
+    scroll-margin-top:1.4rem;
+    text-wrap:balance;
+  }
+  .doc h3{
+    font-family:var(--mono);font-weight:600;
+    font-size:1.12rem;letter-spacing:-.01em;
+    color:var(--ink);
+    margin:2.4rem 0 .8rem;
+    scroll-margin-top:1.4rem;
+  }
+  .doc h4{
+    font-family:var(--mono);font-weight:600;
+    font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--accent);
+    margin:1.8rem 0 .7rem;
+    scroll-margin-top:1.4rem;
+  }
+
+  /* chapter opener */
+  .ch-eyebrow{
+    font-family:var(--mono);font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--signal);font-weight:600;
+    margin:0 0 .1rem;
+    display:flex;align-items:center;gap:.6rem;
+  }
+  .ch-eyebrow::before{content:"";width:20px;height:1px;background:var(--signal);opacity:.6}
+  .doc h2.chapter-title{
+    position:relative;
+    margin-top:.2rem;
+    padding-bottom:1.1rem;
+    border-bottom:1px solid var(--line);
+    margin-bottom:1.6rem;
+  }
+  .doc h2.chapter-title::after{
+    content:attr(data-ch);
+    position:absolute;right:-.1rem;top:50%;transform:translateY(-58%);
+    font-family:var(--mono);font-size:3.4rem;font-weight:600;
+    color:var(--accent);opacity:.08;letter-spacing:-.04em;
+    pointer-events:none;
+  }
+  .chapter-divider{height:0;margin:3.6rem 0 0;border:0}
+
+  /* lists */
+  .doc ul,.doc ol{margin:0 0 1.15rem;padding-left:1.35rem}
+  .doc li{margin:0 0 .5rem;padding-left:.2rem}
+  .doc li::marker{color:var(--accent)}
+  .doc ol li::marker{font-family:var(--mono);font-size:.9em;color:var(--accent);font-weight:600}
+  .doc ul.nested{margin:.55rem 0 .2rem;padding-left:1.2rem}
+  .doc ul.nested li::marker{color:var(--ink-soft)}
+
+  /* legend (route matrix states) — real cell icons */
+  .doc ul.legend{list-style:none;padding-left:0;display:flex;flex-direction:column;gap:.6rem}
+  .doc ul.legend li{display:flex;gap:.75rem;align-items:flex-start;margin:0;padding:0}
+  .doc ul.legend .lg-ico{flex:0 0 auto;width:22px;height:22px;margin-top:.12em;display:inline-flex;align-items:center;justify-content:center}
+  .doc ul.legend .lg-ico svg{width:20px;height:20px;display:block}
+  .doc ul.legend .lg-text{flex:1 1 auto;min-width:0}
+
+  /* inline code */
+  .doc code{
+    font-family:var(--mono);font-size:.85em;
+    background:rgba(10,110,116,.09);
+    color:#0A5A60;
+    padding:.1em .38em;border-radius:4px;
+    border:1px solid rgba(10,110,116,.12);
+    white-space:nowrap;
+  }
+  .doc strong{font-weight:700;color:var(--ink)}
+  .doc em{font-style:italic}
+
+  /* screen (code) panels */
+  .doc .screen{
+    margin:0 0 1.4rem;
+    background:var(--screen);
+    border-radius:9px;
+    overflow:hidden;
+    border:1px solid #0A0F12;
+    box-shadow:0 1px 0 rgba(255,255,255,.5),0 10px 24px -18px rgba(15,21,26,.6);
+  }
+  .doc .screen figcaption{
+    display:flex;align-items:center;gap:.7rem;
+    padding:.55rem .9rem;
+    background:#0B1013;
+    border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  .doc .screen .dots{display:inline-flex;gap:.4rem}
+  .doc .screen .dots i{width:9px;height:9px;border-radius:50%;background:#2C3A3C;display:block}
+  .doc .screen .dots i:nth-child(1){background:#3a4b46}
+  .doc .screen .screen-label{
+    margin-left:auto;font-family:var(--mono);font-size:.66rem;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--screen-dim);
+  }
+  .doc .screen pre{margin:0;padding:1rem 1.1rem;overflow-x:auto}
+  .doc .screen code{
+    font-family:var(--mono);font-size:.82rem;line-height:1.7;
+    color:var(--screen-ink);background:none;border:0;padding:0;white-space:pre;
+  }
+
+  /* tables */
+  .doc .table-wrap{overflow-x:auto;margin:0 0 1.4rem;border:1px solid var(--line);border-radius:9px;background:var(--paper-raised)}
+  .doc table{border-collapse:collapse;width:100%;font-size:.92rem}
+  .doc thead th{
+    font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:600;text-align:left;
+    padding:.7rem .95rem;border-bottom:1px solid var(--line-strong);
+    background:#EEF3F1;white-space:nowrap;
+  }
+  .doc tbody td{padding:.7rem .95rem;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5}
+  .doc tbody tr:last-child td{border-bottom:0}
+  .doc tbody td:first-child{color:var(--ink);font-weight:500}
+  .doc td code,.doc th code{white-space:nowrap}
+
+  /* callouts (Tips) */
+  .doc .callout{
+    margin:0 0 1.4rem;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-left:3px solid var(--signal);
+    border-radius:0 9px 9px 0;
+    padding:1rem 1.2rem .35rem;
+  }
+  .doc .callout .callout-head{
+    font-family:var(--mono);font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--signal);font-weight:600;margin:0 0 .55rem;
+  }
+  .doc .callout ul{margin:0 0 .7rem;padding-left:1.2rem}
+  .doc .callout li{margin-bottom:.4rem}
+  .doc .callout li::marker{color:var(--signal)}
+
+  /* inline tip / note paragraphs */
+  .doc p.tip-inline{
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0;
+    padding:.7rem 1rem;margin-bottom:1.2rem;font-size:.96rem;
+  }
+  .doc p.tip-inline strong:first-child{color:var(--accent)}
+
+  .colophon{
+    font-family:var(--mono);font-size:.76rem;color:var(--ink-soft);
+    max-width:var(--measure);
+    margin:3rem 0 0;padding-top:1.4rem;border-top:1px solid var(--line);
+    font-style:normal;
+  }
+  .colophon em{font-style:normal}
+
+  @media (max-width:920px){
+    .shell{grid-template-columns:1fr;gap:1.6rem}
+    .toc{position:static;top:auto;border:1px solid var(--line);border-radius:10px;background:var(--paper-raised);padding:1rem 1.1rem}
+    .toc ol{gap:0}
+    .doc h2.chapter-title::after{display:none}
+    .doc{max-width:none}
+  }
+  @media print{
+    #mesh,.toc{display:none}
+    .shell{display:block;max-width:none;padding:0}
+    .masthead{border:0}
+    body{font-size:11pt}
+    .doc .screen{box-shadow:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+  }
+</style>
+</head>
+<body>
+
+
+<header class="masthead">
+  <canvas id="mesh" aria-hidden="true"></canvas>
+  <div class="masthead-inner">
+    <p class="eyebrow">User Manual</p>
+    <h1 class="wordmark">Midi<span class="mesh-half">Mesh</span></h1>
+    <p class="tagline">Dante for MIDI — one patchbay for the whole building, wired from a single screen.</p>
+    <div class="chips">
+      <span class="chip"><span class="led"></span> <b>v0.1.20</b></span>
+      <span class="chip">Written for volunteers, not engineers</span>
+      <span class="chip">macOS &middot; Windows</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="toc" id="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol id="toc-list"></ol>
+  </nav>
+  <main class="doc" id="doc"></main>
+</div>
+
+<script type="text/markdown" id="md">
+# MidiMesh User Manual
+
+**MidiMesh is "Dante for MIDI."** It turns a room full of computers, controllers, consoles, and show-control software into one big virtual MIDI patchbay you wire together from a single screen — no cables strung across the building, no engineer required. Send a keyboard on stage to a sound module at front-of-house, let ProPresenter advance lighting cues on a console in another room, trigger the whole rig from a Stream Deck, and watch every message flow in real time.
+
+This manual is written for the people who actually run services and events — volunteers, not network engineers. It walks through everything MidiMesh does, in the order you'll usually meet it.
+
+## How MidiMesh is put together
+
+There are two apps:
+
+- **The Node app** runs on *every* machine that has MIDI gear, MIDI software, or a protocol you want to reach. It quietly connects that machine's inputs and outputs into the mesh.
+- **The Controller app** is the operator's cockpit. It discovers all the nodes and lets you wire, filter, translate, monitor, and back up the entire mesh from one place.
+
+You install the Node app everywhere and open the Controller wherever you like to drive things from.
+
+## Contents
+
+1. [Getting Started: Running Nodes, Discovery & Mesh Security](#1-getting-started)
+2. [The Inventory: Nodes & Endpoints](#2-the-inventory-nodes--endpoints)
+3. [Routing MIDI: Routes, the Matrix, Filters & Connections](#3-routing-midi)
+4. [Connecting Machines: Links & Network MIDI 2.0](#4-connecting-machines-links--network-midi-20)
+5. [Translating MIDI Messages](#5-translating-midi-messages)
+6. [Talking to Other Systems: HTTP, OSC & RossTalk](#6-talking-to-other-systems-http-osc--rosstalk)
+7. [Monitoring & Troubleshooting](#7-monitoring--troubleshooting)
+8. [Saving Your Setup: Scenes & Backup](#8-saving-your-setup-scenes--backup)
+
+---
+
+<a name="1-getting-started"></a>
+
+## Getting Started
+
+### What a node is
+
+A **node** is any computer running the **MidiMesh Node** app. It's the piece that connects your real MIDI gear and MIDI software into the mesh. You install the Node app on every machine that has a keyboard, controller, sound module, or DAW you want to share. The **Controller** app is the operator's cockpit that sees all the nodes and wires them together.
+
+### Running the Node app
+
+When you open the Node app, it does the heavy lifting for you automatically:
+
+1. Launch **MidiMesh Node**. A small background helper (the node's "runtime") starts on its own — you don't launch it separately.
+2. The runtime begins advertising this computer on your local network so the Controller can discover it, and it starts bridging your MIDI ports into the mesh.
+3. The window opens on the **Runtime** panel. Check the header: a colored dot and a status word — **Healthy**, **Warning**, **Error**, or **Offline** — tell you the node's condition at a glance.
+
+If the runtime ever stops, the app shows **"Node runtime is stopped."** and restarts it automatically; you'll briefly see **"Node runtime stopped unexpectedly — restarting…"**. No action is needed.
+
+The Runtime panel also lists **Hostname**, **Peers Online** (how many other nodes this one currently sees), and **Mesh Security**. Footer buttons let you **Hide**, **Refresh**, or **Quit**.
+
+### How the Controller finds nodes
+
+The Controller finds nodes two ways.
+
+**Automatic (same network):** Nodes on the same local network appear on their own. Open the **Inventory** tab and they show up as they come online. If none appear yet, you'll see **"No nodes found"** with the reminder that the controller is listening and a node will **"show up here automatically"** once it's on the network. (Discovery uses mDNS/Bonjour, which only works within a single Wi-Fi or LAN subnet — it doesn't cross routers or VPNs, and the firewall must allow UDP multicast on port 5353.)
+
+**Manual (Tailscale / other VLANs):** Automatic discovery only reaches your local network. For a node across a VPN like Tailscale or on another VLAN, pin it by address:
+
+1. In the Controller toolbar, click the **Add node agent by address** button (the router icon).
+2. In the **Node agent address** field, type the node's address — a hostname, `host:port`, or `http://` URL. The placeholder shows the format: **"host or host:port (default 59421)"**.
+3. Click **Add**.
+
+The pinned node shows a status word: **connecting…**, then **connected**, or **reconnecting…** / **closed** if the link drops. If you see **unauthorized (mesh key?)**, the node is protected and you need the mesh key (see below). Remove a pin with its X button (**Remove this agent address**).
+
+### "Connected" vs "Online"
+
+These two words mean different things:
+
+- **Connected** describes whether the *Controller* currently has a live link to a node. The Inventory header reads **"{N} of {total} connected"**. A node that's running but temporarily unreachable shows **"This node is offline. Edits are disabled until it reconnects."**
+- **Online** describes whether *nodes can see each other* across the mesh. On a node, the **Peers Online** row (e.g. "3 of 5") counts the peers it's currently hearing from.
+
+### Mesh security
+
+The **mesh key** is a shared password that authenticates every node. Set it once and hand the same key to each node so only trusted machines can join.
+
+**Set the key on the Controller:**
+
+1. Click the **Mesh security** button in the toolbar (the key icon).
+2. Type a key into the **Mesh key (join code)** field and click **Save**.
+3. Click **Copy join code** to grab it for a new node (the button confirms with **Copied**).
+
+**Enroll a node:** For any node still showing **open**, click its **Enroll** button. This pushes the key to the node, which restarts protected. You can also join from the node itself: while it's unprotected, its Runtime panel shows a **Join code from controller** field — paste the code and click **Join mesh**.
+
+**Lock it down:** Once at least one node is keyed, tick **Enforce mesh security**. Its note reads **"Drop unauthenticated MIDI on every node (nodes restart)."** This rejects any node that doesn't present the correct key. Keyed nodes then read **Keyed** or **Keyed · enforcing**.
+
+**Tips**
+- Advanced setups can supply the key via the `MIDI_MESH_KEY` environment variable, but the toolbar workflow above is all a volunteer needs.
+- Leaving security **open** is fine for a quick test, but enforce the key for any real installation.
+
+### Launch-at-login, updates & version
+
+- **Start at Login:** On the node's Runtime panel, flip the **Start at Login** toggle so the node comes up automatically after a reboot — ideal for a permanently installed show machine.
+- **Check for updates:** Both apps have a **Check for updates** button in the interface. When an update is ready, click **Restart to update** to install it. You'll see **Up to date** if you're current.
+- **Version:** The installed version shows as **v[number]** — in the Node app's title bar, and in the Controller's toolbar badge (**Installed app version**).
+
+---
+
+<a name="2-the-inventory-nodes--endpoints"></a>
+
+## The Inventory: Nodes & Endpoints
+
+The Inventory view is mission control for what's actually plugged into your mesh — every node (a computer or device running the node-agent), and every **endpoint** on it. An endpoint is a named MIDI in/out point on a node: it could be a virtual MIDI port other apps connect to, a physical USB/DIN MIDI device bridged onto the mesh, or a gateway to something like HTTP, OSC, or RossTalk. Endpoints are what you actually wire together on the Routing/Links views — the Inventory is where you create and manage them.
+
+### Sources, Destinations, and Bidirectional
+
+Every endpoint has a **Direction**, shown in the endpoint table and set from the same dropdown when creating one:
+
+- **Source** — MIDI flows *into* the mesh from this endpoint (e.g., a keyboard controller or a scene-trigger listener).
+- **Destination** — MIDI flows *out of* the mesh to this endpoint (e.g., a synth, a lighting console, or a projector's HTTP trigger).
+- **Bidirectional** — the endpoint can both send into and receive from the mesh (typical for a virtual MIDI port shared with a DAW).
+
+**Tip:** Gateway-type endpoints (HTTP, OSC, RossTalk) have their direction forced by their type — an "in" gateway is always a Source, an "out" gateway is always a Destination. Only **Virtual MIDI** endpoints let you freely choose Source, Destination, or Bidirectional.
+
+### Creating a Virtual MIDI endpoint
+
+Each node card has a **New Endpoint** row at the bottom for adding endpoints to that node.
+
+1. Type a name in the **New Endpoint** field.
+2. Choose a **Type**. The dropdown offers: **Virtual MIDI**, **HTTP trigger (in)**, **HTTP webhook (out)**, **OSC in (UDP)**, **OSC out (UDP)**, **RossTalk in (TCP)**, and **RossTalk out (TCP)**.
+3. If you chose **Virtual MIDI**, pick a **Direction** (Source, Destination, or Bidirectional).
+4. Click **Add**.
+
+The HTTP/OSC/RossTalk types are Protocol Gateway endpoints — see the [Talking to Other Systems](#6-talking-to-other-systems-http-osc--rosstalk) section for how to configure and use those (webhook URLs, listen ports, targets, and message templates). This section only covers plain Virtual MIDI endpoints and hardware bridging.
+
+**Tip:** The **Add** button stays disabled until the node is online, the name field has text, and (for gateway types) the required address/URL field is valid.
+
+### The "MIDI 1.0" checkbox
+
+Every endpoint row has a **MIDI 1.0** checkbox. Turning it on clamps *every delivery to that endpoint* down to classic 7-bit MIDI 1.0 values (0–127) — no MIDI 2.0 high-resolution data — regardless of what the sending route itself is doing. Use this when the gear or software plugged into that endpoint only understands plain 7-bit CC/note values and would misbehave on richer MIDI 2.0 data — Pro Tools is the classic example. Leave it off for anything that's fine with (or benefits from) full-resolution MIDI 2.0.
+
+### Bridging physical MIDI hardware
+
+Physical MIDI hardware — USB MIDI interfaces, DIN 5-pin adapters, class-compliant controllers — doesn't automatically join the mesh. Each node-agent detects the ports the operating system sees and lists them in its own **Hardware MIDI** section (in the node-ui, on the machine itself), one row per port, tagged as *device output → mesh* (an input you can bridge as a Source) or *mesh → device input* (an output you can bridge as a Destination).
+
+To put a hardware port on the mesh:
+
+1. Open the node-agent's window on that machine and find the port under **Hardware MIDI**.
+2. Click **Bridge**.
+
+Bridging creates a mesh endpoint bound to that physical port — it shows up in the Controller's Inventory like any other endpoint, tagged as bridged to hardware, and can be routed to/from just like a virtual endpoint. To take it back off the mesh, click **Unbridge** on that same row; this removes the mesh endpoint but leaves the physical port itself untouched.
+
+Behind the scenes, the node-agent maps ports through CoreMIDI on macOS and WinMM on Windows automatically — you never need to know the platform-specific device ID. If you unplug a bridged USB device and plug it back in (even into a different port), the node-agent recognizes and reattaches it automatically; you don't need to re-bridge it.
+
+**Tip:** Bridged hardware endpoints appear in the Controller's Inventory table too — look for the small hardware badge next to the name. You can rename them, set Direction restrictions, toggle **MIDI 1.0**, and add translation rules just like a virtual endpoint.
+
+### Translating messages
+
+The **Translate** button in each endpoint row (with an arrows icon, and a count badge once rules exist) opens that endpoint's message translation rules — rewriting matching MIDI messages (e.g., turning notes into CCs) on delivery. Full details on building translation rules live in the [Translating MIDI Messages](#5-translating-midi-messages) section; from the Inventory, just know that this button is where you go to set them up per endpoint.
+
+### Renaming and removing a node
+
+Each node card has a **Node Name** field with a **Rename** button next to it — edit the name and click Rename to save. Renaming is disabled while a node is offline.
+
+Offline nodes show a "This node is offline. Edits are disabled until it reconnects" notice along with a **Remove node** button. Removing a node is a two-step confirmation:
+
+1. Click **Remove node**. The button is replaced with **Confirm remove** and **Cancel**.
+2. Click **Confirm remove** to finish, or **Cancel** to back out.
+
+Removing a node strips it — and any routes or links that referenced it — from every other connected node's configuration. This is a "tombstone": if that same node later reconnects, it rejoins the mesh fresh, but **without its old links or routes** — you'll need to re-wire anything that pointed to or from it. This is intentional, so a node you deliberately decommissioned can't silently drag its old wiring back in just by coming back online.
+
+**Tip:** Offline nodes don't expose their endpoints for editing — the endpoint table for an offline node will say "Offline nodes do not expose endpoints" once nothing is left to show, since the node isn't there to confirm the change.
+
+### Editing and deleting endpoints
+
+Each endpoint row is live-editable: change the **Name**, **Direction**, or **MIDI 1.0** checkbox, then click **Save** (it's disabled until something actually changed, and while the node is offline).
+
+Click the trash icon to delete an endpoint. If that endpoint is currently in use by a route or a link, the Controller stops you with a confirmation dialog — **"Endpoint Change Will Remove Dependencies"** — listing the affected routes and connections, since deleting it will remove those too. Confirming the dialog deletes the endpoint and its dependent routes/links together; canceling leaves everything untouched.
+
+---
+
+<a name="3-routing-midi"></a>
+
+## Routing MIDI
+
+Routing is the heart of midimesh. It's how you carry MIDI from where it's produced (a keyboard, ProPresenter, a Companion Stream Deck) to wherever it needs to go (a lighting console, a sound module, front-of-house), even when those devices live on different computers across the building.
+
+### What a route is
+
+A **route** carries MIDI in one direction: from **one source endpoint** to **one or more destination endpoints**. For example, a route from *ProPresenter (Booth PC)* to *Hog Lighting Console (Stage Mac)* pushes program changes from Presentation onto your lighting rig so a slide advance can trigger a lighting cue.
+
+When both endpoints live on the same computer, midimesh just wires them together locally. When they're on **different machines**, midimesh has to move the MIDI over the network — and it handles that for you. The moment you create a route between two nodes, midimesh **automatically ensures the transport link between them exists** (in both directions), so you never have to set up networking by hand. Delete the last route between two machines and midimesh tidies the now-unused link away again.
+
+### The Routing Matrix
+
+Open **Routing Matrix** to see every possible route as a grid:
+
+- **Sources run across the top** (columns).
+- **Destinations run down the left side** (rows).
+- Each **cell** is the intersection: "does this source feed this destination?"
+
+Nodes are grouped, and you can collapse a computer to a single summary icon (worst-state-wins) to keep a big rig readable. An offline machine shows a small cloud-off badge.
+
+**To create a route:**
+
+1. Find the source column and destination row you want.
+2. **Click the cell** to toggle the route on. midimesh creates the route (and the network link, if needed) and the cell lights up.
+3. Click the small magnifier (**Inspect**) in a cell, or click a destination column header, to open the **Route Inspector** on the right.
+
+Click a lit cell again to toggle the route back off.
+
+#### Reading the Matrix
+
+Each cell's dot tells you its state at a glance:
+
+- **available** — empty, no route yet. Click to create one.
+- **active** — a healthy, working route (green check). MIDI is flowing.
+- **connected** — part of a bidirectional **Connection** (see below), working.
+- **merged** — working, and this destination is receiving from **several** sources at once (purple check). See *Merged Destination Mode*.
+- **pending / connecting** — an **hourglass**. The route exists but midimesh hasn't yet confirmed the transport is up. Normal right after you create a route or a machine rejoins — give it a moment.
+- **degraded** — an **amber warning triangle**. This is the important one: the route *was* working, but the peer **went quiet** mid-show. Tooltip: *"Route was up, but the peer stopped answering — check its network/agent."* Treat amber differently from the hourglass: hourglass means "still connecting," amber means "check that machine's network or that its agent is running."
+- **error** — a red **✕**. The route can't be established.
+- **incompatible** — this pairing isn't allowed (for example, a receive-only endpoint can't act as a source). The cell is not clickable.
+
+**Tips**
+- If a whole column of cells goes amber during a service, suspect the **destination machine**, not the routes.
+- An hourglass that never turns into a green check usually means the far computer's midimesh agent isn't running.
+
+### The Route Inspector: editing, filters, enable/disable, delete
+
+Selecting a cell or destination opens the inspector. For an existing route you'll see:
+
+- **Name** and a **Route enabled** checkbox — untick it to silence a route without deleting it (handy for a source you only use seasonally).
+- **Message Filter**, **Group Filter**, and the **Clamp to MIDI 1.0 (0–127)** option (below).
+- **Save** to apply, and **Make Bidirectional** to add a matching reverse route in one click.
+
+For an empty cell you get **New Route** with a **Create Route** button (and a **Bidirectional** shortcut when both endpoints can send and receive).
+
+### Route filters
+
+Filters let a route carry only the messages you want.
+
+- **Channel** — restrict to specific MIDI channels. Great when a shared keyboard sends on channel 1 for the organ patch but you only want channel 10 (drums) going to a module.
+- **Group Filter (UMP groups)** — leave **All groups** ticked to forward everything (the default). Untick it to pick specific groups from the 16 chips. **Groups are numbered 1–16 in midimesh** (matching the activity log), even though MIDI 2.0 counts them from 0 internally.
+- **Message Filter** — tick exactly which message families cross the mesh. The everyday **Channel Voice** types are on by default: *Note On*, *Note Off*, *Control Change*, *Program Change*, *Poly Key Pressure*, *Channel Pressure*, and *Pitch Bend*. You can also opt in to **System Common** (*MTC Quarter Frame*, *Song Position*, *Song Select*, *Tune Request*), **System Real-Time** (*Timing Clock*, *Start*, *Continue*, *Stop*, *Active Sensing*, *System Reset*), **System Exclusive**, and the **MIDI 2.0 rich** types (*Registered/Assignable Controller* = RPN/NRPN, their relative forms, *Per-Note Pitch Bend*, *Registered/Assignable Per-Note Controller*, *Per-Note Management*).
+
+**Tip:** Timing Clock and Active Sensing are high-rate streams excluded by default — only tick them when a destination genuinely needs clock or sensing.
+
+### Clamp to MIDI 1.0 (0–127)
+
+Some gear only understands classic 7-bit MIDI. Ticking **Clamp to MIDI 1.0 (0–127)** on a route down-scales high-resolution MIDI 2.0 values to plain 0–127 before delivery — *"for consumers that read plain 0–127 CC/note values"* like Pro Tools automation. This is a per-route setting. Separately, an **endpoint** can be marked MIDI-1.0-only in its own settings; the two combine — if either the route or the destination endpoint says "clamp," the messages are clamped. Set it on the endpoint when a device is *always* 7-bit; set it on the route for a one-off.
+
+### Merged Destination Mode
+
+When **several sources feed one destination**, that's **Merged Destination Mode** — the destination receives everything in **arrival order**. The inspector shows **Merged: Yes** and the matrix marks those cells purple. Use it when, say, both the worship keyboard and a backup controller should reach the same sound module.
+
+### Connections
+
+A **route** is one-way. A **Connection** is a **paired, bidirectional** relationship between two endpoints — a forward route and a reverse route managed together, each with its own filter.
+
+Open **Connections**, then **New Connection**: give it a **Connection Name**, pick **Endpoint A** and **Endpoint B**, and click **Add Connection**. In the **Connection Editor** you set a **Forward Filter** (A→B) and a **Reverse Filter** (B→A) independently, toggle **Status** (enabled/disabled), and **Save Connection** or **Delete Connection**.
+
+Use a Connection when two devices talk *both ways* — e.g. a *Companion ↔ Hog* pairing where button presses drive the console and console feedback lights the buttons. It keeps both directions in sync as one profile instead of two loose routes.
+
+---
+
+<a name="4-connecting-machines-links--network-midi-20"></a>
+
+## Connecting Machines (Links & Network MIDI 2.0)
+
+midimesh's whole job is carrying MIDI between machines over the network as if it were one big MIDI cable snake. This section explains how machines actually talk to each other, what that "latency" number next to a link means, and how to connect gear that lives outside your own building.
+
+### What's a link?
+
+A **link** is a one-directional transport connection from one node to another — it's what actually carries MIDI packets across the network. You will rarely, if ever, create one by hand. When you build a route in the Controller that sends MIDI from an endpoint on Node A to an endpoint on Node B, the Controller automatically creates the links needed to make that route work — one link A→B and one link B→A, so status and heartbeats can flow both ways. If you later remove all routes between two nodes, you can leave the links in place or let the Controller reuse them next time.
+
+Internally, midimesh's own node-to-node links use a transport called **`mesh-udp-v1`** — a purpose-built UDP fabric for midimesh traffic. If a mesh key is configured for your installation, `mesh-udp-v1` links are **authenticated**: every packet is signed, and nodes without the key are rejected. This is the backbone that connects your midimesh nodes (Stage Mac, FOH Windows PC, a laptop running the Controller, etc.) into one mesh.
+
+### Reading the latency number
+
+Every link shows a **latency** figure in milliseconds. Nodes measure this by riding their regular heartbeat messages: each node reflects back the other's last heartbeat timestamp, and from that round trip it computes the round-trip time (RTT) and reports half of it — the one-way latency — smoothed over a few samples so it doesn't jump around.
+
+For live production, midimesh's target is **under 10 ms** on a local network. The Controller's **Diagnostics** view has a **Link Attention** panel that automatically flags any link measuring **over 10 ms** as high latency, alongside other issues like binding mismatches or dropped/out-of-order packets. If a link shows no latency at all (a dash instead of a number), it usually means traffic hasn't started flowing yet, or heartbeats aren't reaching it in one direction.
+
+**Important:** latency (and heartbeats generally) only show up once a link exists in **both directions**. Since the Controller creates both directions automatically when you make a route, this is normally invisible — but if you ever see a link stuck with no latency reading, check that the reverse link exists too.
+
+### Working across networks
+
+- **Same LAN:** nodes find each other automatically. Turn on midimesh on two machines on the same network and they'll discover one another with no configuration — this is what most church/stage setups use day to day.
+- **Across VLANs, subnets, or a VPN like Tailscale:** automatic discovery doesn't reach across network boundaries, so you pin the far node by its IP address instead. In the Controller, use the toolbar control for adding a node by address (host, `host:port`, or a full URL) — this opens a direct connection to that node the same way a discovered one works, and it's exactly what you'd use for a Tailscale peer or a node on another VLAN that mDNS can't see. See the [Getting Started](#1-getting-started) section for the full walkthrough of first-time discovery and pinning nodes by address.
+
+**Example:** a Stage Mac and a FOH Windows machine on the same church LAN will just find each other. A campus with a second building on its own VLAN, or a remote campus joined over Tailscale, needs that second node pinned by IP once — after that, routing and links between them work exactly the same as local nodes.
+
+### Network MIDI 2.0 (UDP): the industry-standard layer
+
+Alongside its own fabric, every midimesh node also runs a standards-compliant **Network MIDI 2.0 (UDP)** Host — the MIDI Association's official network transport for MIDI 2.0 (spec `M2-124-UM`). This is what lets midimesh talk to gear that isn't midimesh at all: OS-native MIDI 2.0 stacks (Windows MIDI Services, macOS/CoreMIDI, ALSA) and third-party network-UMP hardware.
+
+There are two ways a Network MIDI 2.0 connection gets made:
+
+1. **Automatic discovery.** Every node advertises its Host over `_midi2._udp` (standard DNS-SD/mDNS) and browses for other hosts on the network, offering them up as bridgeable devices.
+2. **Dialing an explicit address.** When discovery isn't available (different subnet, no mDNS), you can connect directly using a port id in the form `net-out:<name>@<host:port>` (or `net-in:<name>@<host:port>` for the inbound side) — this skips discovery entirely and reconnects automatically if the connection drops.
+
+However you connect, each established session shows up in the Controller as a **bridgeable network port** — a `net-in:<name>` / `net-out:<name>` pair — and you route it exactly like a piece of bridged hardware. Where your mesh key is set, it doubles as the shared secret for these sessions too, so Network MIDI 2.0 connections between your own keyed nodes are authenticated the same way internal links are.
+
+**Tips:**
+- Advanced/optional environment settings exist for special cases: `MIDI_MESH_NETWORK_MIDI=0` turns the Network MIDI 2.0 Host off entirely on a node, and `MIDI_MESH_NETWORK_MIDI_PORT` pins it to a fixed UDP port instead of an ephemeral one (useful if you need a stable address to dial into across a firewall). Most installs never need to touch these.
+- The older **rtp-midi** transport is still supported but is legacy-compatibility only, carried for MIDI 1.0 devices that predate Network MIDI 2.0 — new setups should prefer the mesh's own links between midimesh nodes and Network MIDI 2.0 for everything else.
+
+### Honest limitations
+
+Network MIDI 2.0 has been built to spec and verified across midimesh nodes, including a real cross-machine test over a Tailscale-style tunnel. What's **not yet fully validated** is interop against a shipping third-party OS Network MIDI 2.0 stack end-to-end — that testing is pending broader availability of those stacks. Treat third-party Network MIDI 2.0 interop as "should work, built to the standard" rather than "verified against every vendor" until that validation lands.
+
+---
+
+<a name="5-translating-midi-messages"></a>
+
+## Translating MIDI Messages
+
+Some gear speaks a different MIDI "dialect" than the rest of your rig — a footswitch that only sends CC when you really wanted Note On/Off, or a lighting console that needs Program Change where your controller sends notes. **Translation** lets midimesh rewrite messages on the way to a destination, automatically, with no patching required on the device itself.
+
+### What a translation table is
+
+Every endpoint that can receive messages (a **Destination** or **Bidirectional** endpoint) can have its own **translation table** — an ordered list of rules that says "when you see a message like *this*, send *this* instead." Rules are checked top to bottom, and the **first matching rule wins**. Anything that doesn't match any rule passes through completely unchanged.
+
+Translation applies no matter which route or connection is feeding that endpoint — you set it up once, on the destination, and every message delivered to it gets checked against the table.
+
+### Opening the editor
+
+1. Go to the **Inventory** view and find the node that owns the endpoint you want to translate.
+2. In the endpoint's row, find the **Translate** column and click its button (a left-right arrow icon). If the endpoint already has rules, the button shows the rule count next to the icon.
+3. Clicking it expands an editor panel below the row.
+4. Click **Add rule** to add a new rule, or the trash-can button on a rule to remove it.
+5. When you're happy with the table, click **Save** on that endpoint's row — rule changes are part of the endpoint's normal draft/save flow, so nothing takes effect until you save.
+
+### The "When" side (what to match)
+
+Each rule has a **When** side describing the incoming message:
+
+- **Type** — one of the translatable message types (see below).
+- **Channel** — a specific channel 1–16, or **Any** to match every channel. (Channels in the UI are always shown 1-based, even though they're stored 0-based internally.)
+- **Note / CC# / Program** — the note number, controller number, or program number to match, or **Any**. If the type uses note numbers, midimesh shows a small note-name hint next to the field — for example, entering `63` shows **D#4** so you don't have to do the math yourself.
+- **Value from / to** — a value range for the velocity/CC value/pressure. Leave both blank to match **Any** value. Set "from" and "to" to the *same* number for an exact match, or different numbers for a range (e.g. 64 to 127).
+
+Program Change messages have no value, so the value fields don't appear for that type.
+
+### The "Send" side (what to emit)
+
+The **Send** side describes the replacement message:
+
+- **Type** — the outgoing message type (also restricted to the translatable family).
+- **Channel** — a specific channel, or **Keep** to carry over the incoming channel unchanged.
+- **Note / CC# / Program** — a specific outgoing number, or **Keep** to carry over the incoming number.
+- **Value mode** — how the outgoing value is produced:
+  - **Same as incoming (passthrough)** — copies the incoming value straight across. Example: a Note On's velocity of 100 becomes a CC value of 100.
+  - **Fixed** — always sends one specific value, ignoring whatever came in. Example: every matching trigger sends CC value 127, regardless of velocity.
+  - **Toggle** — alternates between an **Off** value and an **On** value each time the rule fires, like a latch. Example: a footswitch that just sends "pressed" over and over can be turned into a mute toggle — first press sends value 127, second press sends 0, third press sends 127 again, and so on. Each source feeding the endpoint latches independently.
+
+### Which messages are translatable
+
+Only the **channel-voice** messages with a clean number/value shape can be matched or emitted: **Note On, Note Off, Control Change, Program Change, Poly Pressure (per-note aftertouch), and Channel Pressure**. Pitch Bend, system messages (clock, transport, etc.), and SysEx cannot be translated — they don't appear in the Type dropdowns and pass through any translation table unaffected.
+
+### Worked examples
+
+**1. Footswitch (CC) → Note On/Off, using two rules**
+A footswitch sends CC 64 with value 127 on press and 0 on release, but your device wants notes.
+- Rule 1 — When: Control Change, channel Any, CC# 64, value **64 to 127** → Send: Note On, channel Keep, Note 60, value Fixed 100.
+- Rule 2 — When: Control Change, channel Any, CC# 64, value **0 to 63** → Send: Note Off, channel Keep, Note 60, value Fixed 0.
+
+**2. A fully specific remap**
+When: Control Change, channel 1, CC# 1, value 15 (from 15 to 15) → Send: Note On, channel 2, Note 63 (shown as **D#4**), value Fixed 55.
+
+**3. Note-to-CC passthrough carrying velocity as the CC value**
+When: Note On, channel Any, Note Any, value Any → Send: Control Change, channel Keep, CC# 20, value **Same as incoming (passthrough)** — a harder hit sends a higher CC value automatically.
+
+### Tips
+
+- Order matters — put your most specific rules first; a broad "match anything" rule earlier in the table will shadow more specific rules below it.
+- Translation only affects messages delivered *to* that endpoint — it has nothing to do with what the endpoint itself sends out.
+- All values here are classic 7-bit MIDI 1.0 (0–127); translation always emits plain 7-bit messages even on a MIDI 2.0 mesh.
+- Don't forget to click **Save** on the endpoint row — building the rules in the editor doesn't apply them until the endpoint is saved.
+
+---
+
+<a name="6-talking-to-other-systems-http-osc--rosstalk"></a>
+
+## Talking to Other Systems (HTTP, OSC & RossTalk)
+
+midimesh doesn't only speak MIDI. Any node can also open a door for HTTP, OSC, or RossTalk — the plain-text protocols used by lighting consoles, video switchers, QLab, X32/M32 mixers, PTZ cameras, Stream Deck, Bitfocus Companion, Node-RED, and dozens of other show-control tools. Once a door is open, traffic on either side crosses into the ordinary mesh: it can be routed, filtered, and remapped through translation tables exactly like a hardware MIDI port.
+
+**The core idea:** a gateway is not a separate "bridge" feature you turn on — it is an **endpoint type** you create in the Inventory, the same list where you create Virtual MIDI endpoints. Creating an "in" endpoint opens a listener on the node (a UDP port, a TCP port, or an HTTP route). Creating an "out" endpoint sends to a target you specify. Nothing listens until the endpoint exists — deleting the endpoint closes the port immediately. After that, you route the gateway endpoint like any other endpoint: give it a role, connect it to sources/destinations, and optionally attach translation rules.
+
+To create one: in **Inventory**, find the node, and under **New Endpoint** set a **Type** from the dropdown (**HTTP trigger (in)**, **HTTP webhook (out)**, **OSC in (UDP)**, **OSC out (UDP)**, **RossTalk in (TCP)**, **RossTalk out (TCP)**), fill in the type-specific field(s) that appear, and click Create.
+
+Only the channel-voice family crosses gateways: Note On/Off, Control Change, Program Change, Poly Key Pressure, Channel Pressure. System messages, SysEx, pitch bend, and MIDI 2.0-only types stay inside the mesh.
+
+### HTTP trigger (in)
+
+Choose **Type: HTTP trigger (in)**. No extra fields — the node immediately starts accepting requests at:
+
+```
+POST http://<node>:59421/v1/trigger/<endpoint name>
+Content-Type: application/json
+
+{"type": "note-on", "channel": 2, "note": "D#4", "velocity": 55}
+```
+
+The `<endpoint name>` in the URL is whatever you named the endpoint (case-insensitive). Only endpoints of this type are reachable this way — a plain Virtual MIDI endpoint has no open door.
+
+Body fields by `type` (numbers 0–127; `channel` is 1–16, default 1; notes accept a name like `D#4` or a number):
+
+| type | fields |
+|---|---|
+| `note-on` / `note-off` | `note` (required), `velocity` (defaults 127 / 0) |
+| `control-change` (alias `cc`) | `controller`, `value` (both required) |
+| `program-change` (alias `pc`) | `program` (required) |
+| `poly-key-pressure` | `note`, `pressure` (both required) |
+| `channel-pressure` | `pressure` (required) |
+
+curl example:
+
+```bash
+curl -X POST http://192.168.50.20:59421/v1/trigger/GoCue \
+  -H "Content-Type: application/json" \
+  -H "x-mesh-key: <mesh key>" \
+  -d '{"type":"note-on","channel":1,"note":"C4","velocity":127}'
+```
+
+**GET form** — for gear that can only open a URL (a Stream Deck "Website" action, a lighting macro), pass the same fields as query parameters instead of a JSON body:
+
+```
+http://192.168.50.20:59421/v1/trigger/Stream%20Deck?type=cc&controller=1&value=15&key=<mesh key>
+```
+
+Every endpoint of this type shows a copyable badge in its Inventory row — **HTTP trigger — copy URL** — click it to grab the exact `/v1/trigger/<name>` URL for that endpoint.
+
+**Tips**
+- The mesh key can travel as an `Authorization: Bearer <key>` header, an `x-mesh-key` header, or `?key=` on the URL — pick whichever your gear supports.
+- Responses: `202` on success (with an echo of the message), `400` for a malformed message, `401` for a missing/wrong mesh key, `404` if no trigger endpoint matches that name, `503` if the node's MIDI runtime isn't up yet.
+- Best for cues and triggers, not continuous streams — each request is one LAN round trip (roughly 1–2 ms with keep-alive) plus the normal mesh hop.
+
+### HTTP webhook (out)
+
+Choose **Type: HTTP webhook (out)** and enter a **Webhook URL**. Every message delivered to the endpoint POSTs as JSON to that URL, with field names that mirror the trigger's input — so one node's webhook can feed straight into another node's trigger:
+
+```json
+{"type": "note-on", "channel": 2, "note": 63, "noteName": "D#4",
+ "velocity": 55, "endpoint": "To Capture", "node": "gw-b"}
+```
+
+Deliveries run through a background sender so a slow or unreachable target never stalls MIDI. A failed delivery shows up as a runtime issue on the endpoint (it clears automatically on the next successful send). HTTPS URLs work fine.
+
+**Tips**
+- If the Webhook URL contains placeholders (see Outbound Templates below), it automatically switches to a GET request instead of a JSON POST — handy for cameras and other CGI-style gear.
+
+### OSC in/out (UDP)
+
+Choose **Type: OSC in (UDP)** and give it a **Listen port** (e.g. `8000`), or **Type: OSC out (UDP)** and give it a **Target** in `host:port` form (e.g. `192.168.50.40:8000`). Both directions share one canonical address scheme, so two midimesh nodes — or midimesh and any OSC surface (TouchOSC, QLab, Companion) — talk without extra configuration:
+
+```text
+/midimesh/note-on          ch note vel      (vel optional, default 127)
+/midimesh/note-off         ch note vel      (vel optional, default 0)
+/midimesh/cc               ch controller value
+/midimesh/pc               ch program
+/midimesh/poly-pressure    ch note pressure
+/midimesh/channel-pressure ch pressure
+```
+
+(`/midimesh/control-change` and `/midimesh/program-change` are also accepted inbound as long-form aliases.) Channels are 1–16. Arguments can be sent as ints or floats — a **float between 0.0 and 1.0 scales to 0–127**, TouchOSC-fader style, so a fader page sending `0.0`–`1.0` drives a full-range CC without any math on your end. This makes OSC the right choice for continuous fader rides, not just button presses.
+
+**Tips**
+- If several endpoints share the same listen port, each one receives every inbound message.
+- Unknown addresses and bad datagrams are ignored quietly — they won't show up as errors.
+
+### RossTalk in/out (TCP, port 7788)
+
+RossTalk is Ross Video's plain-text control protocol, traditionally on TCP port 7788. Choose **Type: RossTalk in (TCP)** with a **Listen port** (default `7788`), or **Type: RossTalk out (TCP)** with a **Target** in `host:port` form.
+
+The fixed canonical mapping (remap it with translation tables if you need something different):
+
+```text
+inbound   GPI n       -> Note On, channel 1, note n, velocity 127
+inbound   CC bank:num -> Control Change, channel bank (clamped 1-16),
+                         controller num, value 127
+outbound  Note On (vel > 0), note n            -> "GPI n"
+outbound  Control Change (value >= 64), ctrl n -> "CC <channel>:<n>"
+```
+
+Other inbound commands (`CUT`, `TAKE`, etc.) are ignored. Outbound releases — Note Off, or a CC value under 64 — never re-fire; a custom control only fires on the press edge. The outbound side holds one persistent TCP connection per target and automatically redials if it drops; an unreachable target shows as a runtime issue until it reconnects.
+
+### Outbound Templates
+
+Any -out endpoint (HTTP webhook, OSC out, or RossTalk out) can carry an optional **Template** so it speaks the exact vocabulary a fixed-format receiver expects — QLab, an X32/M32, a PTZ camera, a video switcher — instead of midimesh's own message shape.
+
+Placeholders resolve against the message being delivered:
+
+```text
+{channel}                        1-based channel
+{note} {controller} {program}    the semantic number (same value, named per type)
+{velocity} {value} {pressure}    the semantic value (same value, named per type)
+{noteName}                       number as a note name, e.g. D#4
+{type}                           kebab-case message type, e.g. "note-on"
+{channel:02}                     zero-padded to a width (any placeholder)
+{value%}                         value scaled 0.0-1.0 (for faders)
+```
+
+**Worked examples:**
+
+```text
+QLab cue trigger (OSC out):     osc-out:qlab.local:53000 /cue/{note}/start
+X32 fader ride (OSC out):       osc-out:x32.local:10023 /ch/{channel:02}/mix/fader {value%}
+PTZ camera preset (HTTP out):   http://cam1/cgi-bin/ptzctrl.cgi?preset={note}
+Ross switcher cut (RossTalk):   rosstalk-out:carbonite.local:7788 CUT MEs:{note}
+```
+
+For OSC, type the target host:port in the **Target** field and the address + arguments in **Template** (e.g. `/cue/{note}/start`, or `/ch/{channel:02}/mix/fader {value%}` for a fader). For HTTP webhook, just put the placeholders directly in the **Webhook URL** field — a URL containing `{...}` automatically becomes a GET instead of a JSON POST. For RossTalk, the **Template** field is the entire command line.
+
+**Firing rules** — these matter, so don't skip them:
+- A template that does **not** reference the value (`{value}`, `{velocity}`, `{pressure}`, or `{value%}`) is a **trigger**: it only fires on the press edge (Note On with velocity > 0, CC value ≥ 64; Program Change and pressure messages always fire). This is what you want for cues — the release doesn't re-fire the cue.
+- A template that **does** reference the value is **continuous**: every value fires, so fader rides pass through cleanly.
+- **Note Off never fires a template**, regardless of which kind it is.
+- If a message can't supply a placeholder the template asks for (e.g. `{velocity}` on a Program Change), that one delivery is silently dropped rather than sent malformed.
+- Leave the Template field empty to keep the canonical behavior described above for that protocol (plain `/midimesh/*` OSC, plain JSON webhook, plain GPI/CC RossTalk).
+
+**Tips**
+- Pairing a gateway endpoint with **Bitfocus Companion** or **Node-RED** is the real superpower here — both speak HTTP and OSC natively, and each can fan out to hundreds of downstream devices, buttons, and integrations that would otherwise never see MIDI.
+- **Security note:** the HTTP trigger enforces the mesh key on every request. OSC and RossTalk have no authentication built into the protocol itself — treat them as LAN-trust, the same trust level as the MIDI mesh plane itself. Don't expose those ports beyond your production network.
+
+---
+
+<a name="7-monitoring--troubleshooting"></a>
+
+## Monitoring & Troubleshooting
+
+A core promise of midimesh is *diagnosis in one glance* — when a cue doesn't fire mid-service, you should be able to see why in seconds. The Controller's **Diagnostics** tab is where you do that, and every node's own window carries a few local tools too.
+
+### The summary stats
+
+Open the **Diagnostics** tab. Across the top, six live counters summarize the whole mesh:
+
+- **Nodes Online** — machines running MidiMesh Node that are currently reachable.
+- **Active Routes** — routes that are configured and enabled.
+- **Active Links** — network connections between nodes that are currently up.
+- **Sessions** — live transport sessions (handshaked connections) right now.
+- **Packets Sent** / **Packets Received** — running totals of network traffic moved across the mesh.
+
+If a number here is lower than you expect — fewer Nodes Online than machines in the room, fewer Active Links than you configured — that's your first clue something is down, before you look at a single cable. If MIDI is flowing, Packets Sent/Received climb.
+
+### Node Health
+
+A simple table of every node's name and a health pill (Healthy / Warning / Error / Offline) — the fastest way to spot the machine having trouble. Below it, midimesh also calls out if any links have a **runtime binding that differs from configuration**, or show **packet sequence anomalies** (drops or out-of-order arrivals) — early warnings worth a look even if the pill is still green.
+
+### Delivery Pipeline
+
+A scoreboard tracking MIDI through each stage of the system, with **Succeeded** / **Failed** counts and a health dot per row:
+
+| Pipeline stage | What it means |
+|---|---|
+| **Local Delivery** | MIDI moving to a destination on the same machine |
+| **Remote Outbound** | MIDI leaving this node across the mesh |
+| **Remote Inbound** | MIDI arriving at this node from the mesh |
+| **Endpoint Realization** | Creating/binding an endpoint (e.g. to a hardware port) |
+| **Transport Rebind** | The network transport reconnecting after an IP/network change |
+| **Mesh Auth Drops** | Packets rejected because they failed the mesh-key check |
+
+Any row with a non-zero **Failed** count flips its dot amber — that's the stage to investigate first.
+
+### Link Attention — the "something's wrong with the network" panel
+
+The **Link Attention** panel only appears when a link needs a look. Each row shows the link (**From → To**), its **State**, **Latency**, **Health**, and a plain-language **Notes** column. It flags:
+
+- **high latency** — any link over **10 ms** (live production wants sub-10ms LAN hops); the latency reads in amber.
+- **binding mismatch** — the live network binding differs from what's configured.
+- **dropped / out-of-order** packets — network trouble on that hop.
+
+If a link never appears here, it's healthy — the panel's silence is good news.
+
+### Runtime Issues — plain-language warnings
+
+The **Runtime Issues** panel lists everything a node is unhappy about, most-severe and newest first, each with a **Source** (which node/component), a **Message** in plain English, how many times it's happened and when it was last **Seen**, and a **Severity** dot. The messages are written to read consistently on every install. Examples you'll actually see:
+
+- *"bridged MIDI device 'X' is not connected — the bridge resumes automatically when it returns"* — a USB/DIN device is unplugged or powered off; reconnect it and the bridge comes back on its own.
+- *"dropped an inbound packet that failed mesh authentication"* — something tried to talk to the node without the correct mesh key.
+- *"remote delivery skipped because no link is configured"* — a route points at a machine with no network path yet.
+- *An OSC/RossTalk listen port is already in use* — another program holds that port; free it and the node retries every few seconds.
+- *A webhook / OSC / RossTalk target is unreachable* — the destination refused or timed out; the command was dropped.
+- *The MIDI subsystem or discovery service failed to start* — usually a driver or permissions issue on that machine.
+
+A **Controller update warning** ("protocol version mismatch") also appears here if a node is running a newer build than your Controller app understands — update the Controller app to catch up; until then, some of that node's newer features may not display.
+
+### The MIDI Activity log
+
+The **MIDI Activity** panel is a live feed of real MIDI crossing the mesh — your proof that messages are actually flowing. Each row shows **Time**, **Agent** (which node, when "All agents" is selected), **Direction**, **Endpoint**, and the decoded **Message**:
+
+- **Direction** is one of **Generated**, **Local in**, **Local out**, **Mesh in**, or **Mesh out**.
+- **Message** shows the actual content (e.g. "Note On C4 vel 100 ch 1"), and for MIDI 2.0 traffic the full high-resolution value with its bit depth (e.g. "vel 51480 (16-bit)") plus the UMP group where relevant.
+
+Use the **All agents** dropdown to focus on a single node. Two high-rate housekeeping streams — **Timing Clock** and **Active Sensing** — are deliberately *not* logged (they still route normally); as continuous streams they'd flood the log and bury everything meaningful within seconds.
+
+If a **repeating generator** is running on any node, a banner above the log shows what it's generating and since when.
+
+### Quick "is this path working?" tools
+
+Right in the MIDI Activity panel, once you pick a specific agent from the dropdown:
+
+- **Send test note** — choose one of that node's source endpoints and click it. midimesh sends a note-on/off pair and you watch it appear in the log (and arrive at whatever it's routed to). This is the fastest answer to "why didn't my cue fire?" — it isolates whether the problem is your source or your routing. You'll see **"Test note sent — watch for it below."**
+- **Fire (MSC / MMC)** — send a **MIDI Show Control** cue (pick a format **Lighting / Sound / Video / All types**, a command **GO / STOP / RESUME / RESET**, and a **cue** number like `5.2`) or a **MIDI Machine Control** transport command (**PLAY / STOP / PAUSE / RECORD / REWIND / FAST FWD**), then click **Fire**. Consoles that cue over SysEx understand these directly, and midimesh decodes MSC/MMC right in the activity log (e.g. "MSC GO cue 5.2 lighting") so you can confirm what a console actually sent.
+
+### The node's own send & generator tools
+
+Each **MidiMesh Node** app (on the machine itself) has its own tools, handy when you're standing at the source machine and want to prove a port before wiring it into a service:
+
+- **MIDI Generator** — pick a source endpoint, a message type (any MIDI 1.0 or 2.0 type, including **System Exclusive**), channel, group, and values. Tick **MIDI 2.0 (high-res)** to send a full-resolution value instead of the coarse 0–127 one; for SysEx there's a **SysEx data (hex, no F0/F7)** field for raw payload bytes. Send a single message, or run a repeating generator at a chosen **Repeat Interval (ms)** (minimum 50 ms) to soak-test a path, then stop it.
+- **MIDI Viewer** — shows incoming MIDI arriving at that node from the rest of the mesh.
+
+### Exporting logs for support
+
+When you need to hand someone the details, the **Agent Logs** panel has an **Export logs** button per node. It downloads a text file containing that node's recent log lines plus its latest health/counter snapshot — the single file to attach when asking for help or reviewing an incident afterward.
+
+### Merged Destinations
+
+If a destination is fed by more than one active source at once, it's listed here (and noted under Node Health) as a merged-destination cell — messages arrive in the order they're received across the sources. Click a row to jump straight to that route in the Routing view.
+
+### Troubleshooting quick-reference
+
+| Symptom | Where to look |
+|---|---|
+| A matrix cell is an **amber triangle** | The destination machine's network/agent — it stopped answering (see [Routing](#3-routing-midi)) |
+| A cell stays an **hourglass** and never turns green | The far node's agent isn't running, or there's no network path — check Node Health & Link Attention |
+| **Latency** flagged over 10 ms | Link Attention → the slow hop; check Wi-Fi vs. wired and network load |
+| A **cue didn't fire** | Send test note (or Fire MSC/MMC) from the source node, watch the Activity log, and confirm the route exists and its filter passes that message type |
+| MIDI **leaves a node but never arrives** elsewhere | Delivery Pipeline → Remote Outbound / Remote Inbound Failed counts |
+| A **bridged device** went dark | Runtime Issues → "not connected"; reconnect it (the bridge resumes automatically) |
+| A **gateway isn't receiving** | Runtime Issues → "listen port in use"; free the port |
+| A **webhook / OSC / RossTalk out** target is silent | Runtime Issues → "unreachable"; check the address and that the receiver is up |
+| A node shows **unauthorized** / **auth drops** | It needs the mesh key — enroll it (see [Getting Started](#1-getting-started)) |
+| New features from a node **aren't showing** in the Controller | Runtime Issues → "protocol version mismatch"; update the Controller app |
+
+**Tips**
+- Green Node Health + climbing Packets + a quiet Link Attention panel = a healthy mesh. Learn that "all quiet" baseline so anomalies jump out at you.
+- **Send test note** or **Fire** during soundcheck, not during the show — confirming the path works ahead of time turns a live scramble into a non-event.
+- A link's latency creeping over 10 ms during an event is worth investigating even if nothing sounds wrong yet — it's an early warning, not just a post-mortem stat.
+- Timing Clock and Active Sensing never appear in the activity log — that's expected, not a sign they aren't routing.
+- Export a node's logs *before* restarting it, so you don't lose the evidence of what went wrong.
+
+---
+
+<a name="8-saving-your-setup-scenes--backup"></a>
+
+## Saving Your Setup (Scenes & Backup)
+
+The **Scenes & Backup** panel is where you protect your work and switch between setups in one click. It lives alongside the rest of the mesh controls and gives you three tools: **Export config**, **Import & apply**, and named **Scenes**.
+
+### What a scene or exported config actually contains
+
+A saved config is a snapshot of your whole mesh's wiring: every node, endpoint, link, route, connection — the complete map of what's plugged into what. It does **not** include live, moment-to-moment state (like an active session's transport details); it's the *configured* topology, the part you built on purpose.
+
+Because node identity in a saved config is matched against whatever is live on the mesh when you apply it, a config saved on Sunday will still apply cleanly later even if a machine got renamed or reconnected under a new address in the meantime.
+
+### Exporting a backup
+
+1. Open **Scenes & Backup**.
+2. Click **Export config**.
+3. A file named `midimesh-config-<date>-<time>.json` downloads to your computer.
+
+This file is plain JSON (tagged internally as a `midimesh-config`) containing your endpoints, links, routes, and connections. Keep it for:
+
+- **A safety net before a big change** — rewiring routes for a new event, adding nodes, etc.
+- **Moving a setup to another install** — copy the file to a new machine's controller and import it there.
+- **Sharing a known-good config** — send the file to another volunteer or keep it as a reference for "how service should be wired."
+
+### Importing and applying a config
+
+1. Click **Import & apply…**.
+2. Choose a previously exported `.json` file (or a scene file someone sent you).
+3. The controller pushes that wiring to every node **currently connected** to the mesh, and a status line reports which nodes got it and which were skipped because they were offline.
+
+If the file isn't a valid midimesh config (wrong format, corrupted, or from an unsupported version), you'll see a friendly error message and **nothing is changed** — your current live setup is left exactly as it was.
+
+### Saving and applying scenes
+
+Scenes are named snapshots you can recall instantly — perfect for a church running different configurations for, say, Sunday morning worship, a youth night, and a special event in the fellowship hall.
+
+1. Type a name into the **scene name** field (e.g. "Sunday AM").
+2. Click **Save scene**.
+3. The scene appears in the list below, with the date/time it was saved.
+4. To recall it later, find it in the list and click **Apply**.
+
+Applying a scene works the same way as importing a file — it pushes that saved wiring out to the nodes that are connected right now. You can also delete old scenes from the list with the trash icon when you no longer need them.
+
+**Note on where scenes live:** scenes are saved in this controller computer's local browser storage, not as separate files on disk. If you want a scene to survive a controller reinstall or move to another machine, export it as a config file too.
+
+### Important behavior to know
+
+- **Scenes and imports only reach nodes that are connected at that moment.** If a node's machine is powered off or disconnected when you apply, it's skipped and listed as such in the status message.
+- **Offline nodes catch up automatically when they reconnect.** The mesh tracks a config revision number; a node that reconnects after missing a change gets resynced to the current topology rather than dragging its stale settings back in.
+- **A bad file can't hurt you.** An invalid or corrupted config is rejected before anything is touched.
+
+### Tips
+
+- **Export before every service.** Get in the habit of clicking **Export config** a few minutes before doors open — a 10-second habit that turns "everything's broken" into "restore last Sunday's file."
+- **Keep dated copies**, not just one overwritten file — if you ever need to roll back two weeks, you'll want the older one too.
+- **Name scenes for the event, not the date** ("Sunday AM", "Youth Night", "Baptism Service") so anyone on the team can find and apply the right one without guessing.
+- **Make sure everyone's powered on before applying a scene** so no node gets left behind — check the status message after applying to confirm nothing was skipped.
+
+---
+
+*This manual documents MidiMesh v0.1.20. Screens and labels may shift slightly as the app evolves; the concepts stay the same.*
+</script>
+
+<script>
+(function(){
+  "use strict";
+  var src = document.getElementById('md').textContent;
+
+  function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function inline(s){
+    s = esc(s);
+    s = s.replace(/`([^`]+)`/g, function(m,c){return '<code>'+c+'</code>';});
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(m,t,u){return '<a href="'+u+'">'+t+'</a>';});
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    return s;
+  }
+  function slug(s){return s.toLowerCase().replace(/&[a-z]+;/g,'').replace(/[^\w]+/g,'-').replace(/^-+|-+$/g,'');}
+  var stripMarker = function(l){return l.replace(/^\s*([-*]|\d+\.)\s+/,'');};
+
+  function listBlock(items){
+    var ordered = /^\s*\d+\.\s/.test(items[0]);
+    var html = ordered ? '<ol>' : '<ul>';
+    var i = 0;
+    while(i < items.length){
+      var indent = items[i].match(/^(\s*)/)[1].length;
+      if(indent >= 2){ i++; continue; }
+      var li = '<li>' + inline(stripMarker(items[i]));
+      var j = i + 1, nested = [];
+      while(j < items.length && items[j].match(/^(\s*)/)[1].length >= 2){ nested.push(items[j]); j++; }
+      if(nested.length){
+        li += '<ul class="nested">';
+        for(var k=0;k<nested.length;k++){ li += '<li>' + inline(stripMarker(nested[k])) + '</li>'; }
+        li += '</ul>';
+      }
+      li += '</li>';
+      html += li;
+      i = j;
+    }
+    return html + (ordered ? '</ol>' : '</ul>');
+  }
+
+  function tableBlock(rows){
+    function cells(r){
+      return r.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(function(c){return c.trim();});
+    }
+    var html = '<div class="table-wrap"><table><thead><tr>';
+    cells(rows[0]).forEach(function(c){ html += '<th>'+inline(c)+'</th>'; });
+    html += '</tr></thead><tbody>';
+    for(var r=2;r<rows.length;r++){
+      html += '<tr>';
+      cells(rows[r]).forEach(function(c){ html += '<td>'+inline(c)+'</td>'; });
+      html += '</tr>';
+    }
+    return html + '</tbody></table></div>';
+  }
+
+  function codeBlock(lang, code){
+    var labels = {bash:'Terminal', json:'JSON', text:'', '':''};
+    var label = (lang in labels) ? labels[lang] : lang;
+    return '<figure class="screen"><figcaption><span class="dots"><i></i><i></i><i></i></span>' +
+      (label ? '<span class="screen-label">'+esc(label)+'</span>' : '') +
+      '</figcaption><pre><code>' + esc(code) + '</code></pre></figure>';
+  }
+
+  function parse(src){
+    var lines = src.replace(/\r/g,'').split('\n');
+    var out = [], i = 0, pendingId = null, beforeFirstH2 = true;
+    var isItem = function(l){ return /^\s*([-*]|\d+\.)\s+/.test(l); };
+    while(i < lines.length){
+      var line = lines[i];
+      var am = line.match(/^<a name="([^"]+)"><\/a>\s*$/);
+      if(am){ pendingId = am[1]; i++; continue; }
+      if(/^##\s+Contents\s*$/.test(line)){
+        i++;
+        while(i < lines.length && lines[i].trim() !== '---') i++;
+        i++;
+        continue;
+      }
+      if(/^#\s+/.test(line)){ i++; continue; }
+      if(/^```/.test(line)){
+        var lang = line.slice(3).trim();
+        i++;
+        var buf = [];
+        while(i < lines.length && !/^```/.test(lines[i])){ buf.push(lines[i]); i++; }
+        i++;
+        out.push(codeBlock(lang, buf.join('\n')));
+        continue;
+      }
+      if(line.trim().charAt(0) === '|' && i+1 < lines.length &&
+         /^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/.test(lines[i+1])){
+        var rows = [];
+        while(i < lines.length && lines[i].trim().charAt(0) === '|'){ rows.push(lines[i]); i++; }
+        out.push(tableBlock(rows));
+        continue;
+      }
+      var hm = line.match(/^(#{2,4})\s+(.*)$/);
+      if(hm){
+        var level = hm[1].length;
+        var text = hm[2].trim();
+        var id = pendingId || slug(text);
+        pendingId = null;
+        beforeFirstH2 = false;
+        out.push('<h'+level+' id="'+id+'">'+inline(text)+'</h'+level+'>');
+        i++;
+        continue;
+      }
+      if(line.trim() === '---'){ out.push('<hr class="chapter-divider">'); i++; continue; }
+      if(line.trim() === ''){ i++; continue; }
+      if(isItem(line)){
+        var items = [];
+        while(i < lines.length && isItem(lines[i])){ items.push(lines[i]); i++; }
+        out.push(listBlock(items));
+        continue;
+      }
+      out.push('<p'+(beforeFirstH2?' class="lead"':'')+'>'+inline(line.trim())+'</p>');
+      i++;
+    }
+    return out.join('\n');
+  }
+
+  var doc = document.getElementById('doc');
+  doc.innerHTML = parse(src);
+
+  // Chapters: number + eyebrow + TOC
+  var tocList = document.getElementById('toc-list');
+  var pad = function(n){ return n < 10 ? '0'+n : ''+n; };
+
+  // Overview entry (first non-chapter h2)
+  var overview = doc.querySelector('h2:not([id^="1"]):not([id^="2"]):not([id^="3"]):not([id^="4"]):not([id^="5"]):not([id^="6"]):not([id^="7"]):not([id^="8"])');
+  if(overview){
+    var oli = document.createElement('li');
+    oli.innerHTML = '<a href="#'+overview.id+'"><span class="n">·</span><span>Overview</span></a>';
+    tocList.appendChild(oli);
+  }
+
+  var chapters = Array.prototype.filter.call(doc.querySelectorAll('h2[id]'), function(h){
+    return /^\d/.test(h.id);
+  });
+  chapters.forEach(function(h){
+    var num = parseInt(h.id, 10);
+    var pn = pad(num);
+    h.classList.add('chapter-title');
+    h.setAttribute('data-ch', pn);
+    var eb = document.createElement('p');
+    eb.className = 'ch-eyebrow';
+    eb.textContent = 'Chapter ' + pn;
+    h.parentNode.insertBefore(eb, h);
+    var li = document.createElement('li');
+    li.innerHTML = '<a href="#'+h.id+'"><span class="n">'+pn+'</span><span>'+h.textContent+'</span></a>';
+    tocList.appendChild(li);
+  });
+
+  // Tips callouts: wrap a "Tips"/"Tips:" paragraph + following list
+  Array.prototype.forEach.call(doc.querySelectorAll('p'), function(p){
+    var t = p.textContent.trim();
+    if(/^Tips:?$/.test(t)){
+      var list = p.nextElementSibling;
+      if(list && (list.tagName === 'UL' || list.tagName === 'OL')){
+        var aside = document.createElement('aside');
+        aside.className = 'callout';
+        p.parentNode.insertBefore(aside, p);
+        var head = document.createElement('p');
+        head.className = 'callout-head';
+        head.textContent = 'Tips';
+        aside.appendChild(head);
+        aside.appendChild(list);
+        p.parentNode.removeChild(p);
+      }
+    }
+  });
+
+  // Inline "Tip:" / "Note ...:" single paragraphs
+  Array.prototype.forEach.call(doc.querySelectorAll('p'), function(p){
+    var strong = p.querySelector('strong');
+    if(strong && p.firstElementChild === strong){
+      var s = strong.textContent.trim();
+      if(/^Tip:/.test(s) || /^Note\b/.test(s) || /^Important:/.test(s)){
+        p.classList.add('tip-inline');
+      }
+    }
+  });
+
+  // Route-matrix legend colouring
+  var rm = doc.querySelector('h4[id="reading-the-matrix"]') ||
+           Array.prototype.filter.call(doc.querySelectorAll('h4'), function(h){return /Reading the Matrix/i.test(h.textContent);})[0];
+  if(rm){
+    var ul = rm.nextElementSibling;
+    while(ul && ul.tagName !== 'UL') ul = ul.nextElementSibling;
+    if(ul){
+      ul.classList.add('legend');
+      // Actual lucide icons the Route Matrix uses for each cell state.
+      var ICON = {
+        available:   '<path d="M5 12h14"/><path d="M12 5v14"/>',
+        active:      '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+        connected:   '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+        merged:      '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+        pending:     '<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>',
+        degraded:    '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+        error:       '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+        incompatible:'<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>'
+      };
+      var COLOR = {
+        available:'var(--st-available)', active:'var(--st-active)', connected:'var(--st-connected)',
+        merged:'var(--st-merged)', pending:'var(--st-pending)', degraded:'var(--st-pending)',
+        error:'var(--st-error)', incompatible:'var(--st-available)'
+      };
+      Array.prototype.forEach.call(ul.children, function(li){
+        var st = ((li.querySelector('strong') || {}).textContent || '').toLowerCase();
+        var state = 'available';
+        if(st.indexOf('active') === 0) state='active';
+        else if(st.indexOf('connected') === 0) state='connected';
+        else if(st.indexOf('merged') === 0) state='merged';
+        else if(st.indexOf('pending') === 0) state='pending';
+        else if(st.indexOf('degraded') === 0) state='degraded';
+        else if(st.indexOf('error') === 0) state='error';
+        else if(st.indexOf('incompatible') === 0) state='incompatible';
+        li.setAttribute('data-state', state);
+        // Wrap the text so the flex <li> has exactly two children (icon + text
+        // block); otherwise each inline <strong>/<em> becomes its own flex item.
+        var ico = '<span class="lg-ico" style="color:'+COLOR[state]+'">'+
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" '+
+          'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICON[state]+'</svg></span>';
+        li.innerHTML = ico + '<span class="lg-text">' + li.innerHTML + '</span>';
+      });
+    }
+  }
+
+  // Colophon
+  var ps = doc.querySelectorAll('p');
+  var last = ps[ps.length-1];
+  if(last && /This manual documents/.test(last.textContent)){ last.className = 'colophon'; }
+
+  // Scroll-spy
+  var tocLinks = {};
+  Array.prototype.forEach.call(tocList.querySelectorAll('a'), function(a){
+    tocLinks[a.getAttribute('href').slice(1)] = a;
+  });
+  var spyTargets = [];
+  if(overview) spyTargets.push(overview);
+  chapters.forEach(function(h){ spyTargets.push(h); });
+  if('IntersectionObserver' in window){
+    var current = null;
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          var id = e.target.id;
+          if(current && tocLinks[current]) tocLinks[current].classList.remove('on');
+          if(tocLinks[id]){ tocLinks[id].classList.add('on'); current = id; }
+        }
+      });
+    }, { rootMargin: '0px 0px -75% 0px', threshold: 0 });
+    spyTargets.forEach(function(t){ io.observe(t); });
+  }
+
+  // ---------- Masthead signal-mesh canvas ----------
+  var canvas = document.getElementById('mesh');
+  var ctx = canvas.getContext('2d');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var nodes = [
+    {x:0.06,y:0.30},{x:0.19,y:0.72},{x:0.31,y:0.20},{x:0.44,y:0.56},
+    {x:0.55,y:0.26},{x:0.66,y:0.70},{x:0.79,y:0.36},{x:0.92,y:0.60},{x:0.50,y:0.90}
+  ];
+  var edges = [[0,2],[0,1],[1,3],[2,3],[3,4],[4,6],[3,5],[5,7],[6,7],[4,5],[1,8],[5,8],[2,4]];
+  var pulses = [];
+  var W=0,H=0,dpr=1;
+  function resize(){
+    var r = canvas.getBoundingClientRect();
+    W = r.width; H = r.height;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.floor(W*dpr));
+    canvas.height = Math.max(1, Math.floor(H*dpr));
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  function P(n){ return { x: n.x*W, y: n.y*H }; }
+  function ctrl(a,b){ return { x:(a.x+b.x)/2, y:(a.y+b.y)/2 - Math.abs(b.x-a.x)*0.12 }; }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // edges
+    for(var i=0;i<edges.length;i++){
+      var a=P(nodes[edges[i][0]]), b=P(nodes[edges[i][1]]), c=ctrl(a,b);
+      ctx.beginPath();
+      ctx.moveTo(a.x,a.y);
+      ctx.quadraticCurveTo(c.x,c.y,b.x,b.y);
+      ctx.strokeStyle='rgba(10,110,116,0.16)';
+      ctx.lineWidth=1;
+      ctx.stroke();
+    }
+    // pulses
+    for(var p=0;p<pulses.length;p++){
+      var pu=pulses[p];
+      var e=edges[pu.e], a2=P(nodes[e[0]]), b2=P(nodes[e[1]]), c2=ctrl(a2,b2);
+      var t=pu.t, mt=1-t;
+      var x=mt*mt*a2.x+2*mt*t*c2.x+t*t*b2.x;
+      var y=mt*mt*a2.y+2*mt*t*c2.y+t*t*b2.y;
+      ctx.beginPath();
+      ctx.arc(x,y,2.6,0,Math.PI*2);
+      ctx.fillStyle='rgba(18,162,154,'+(0.85*Math.sin(Math.PI*t)).toFixed(3)+')';
+      ctx.fill();
+    }
+    // nodes
+    for(var n=0;n<nodes.length;n++){
+      var q=P(nodes[n]);
+      ctx.beginPath();
+      ctx.arc(q.x,q.y,4.2,0,Math.PI*2);
+      ctx.fillStyle='#EEF2F0';
+      ctx.fill();
+      ctx.lineWidth=1.4;
+      ctx.strokeStyle='rgba(10,110,116,0.55)';
+      ctx.stroke();
+    }
+  }
+  var lastSpawn=0;
+  function tick(ts){
+    for(var p=pulses.length-1;p>=0;p--){
+      pulses[p].t += pulses[p].sp;
+      if(pulses[p].t>=1) pulses.splice(p,1);
+    }
+    if(ts-lastSpawn>620 && pulses.length<6){
+      pulses.push({ e: Math.floor(Math.random()*edges.length), t:0, sp:0.006+Math.random()*0.006 });
+      lastSpawn=ts;
+    }
+    draw();
+    requestAnimationFrame(tick);
+  }
+  function init(){
+    resize();
+    if(reduce){ draw(); }
+    else { requestAnimationFrame(tick); }
+  }
+  var rt;
+  window.addEventListener('resize', function(){
+    clearTimeout(rt);
+    rt=setTimeout(function(){ resize(); if(reduce) draw(); }, 120);
+  });
+  init();
+
+  // Smooth in-page scrolling for TOC + doc links
+  document.addEventListener('click', function(e){
+    var a = e.target.closest && e.target.closest('a[href^="#"]');
+    if(!a) return;
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if(el){ e.preventDefault(); el.scrollIntoView({behavior: reduce ? 'auto' : 'smooth', block:'start'}); history.replaceState(null,'','#'+id); }
+  });
+})();
+</script>
+
+</body>
+</html>
