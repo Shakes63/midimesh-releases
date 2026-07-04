@@ -6,4 +6,4 @@ Installers and `electron-updater` channel feeds are attached to each release. Gr
 
 ## User manual
 
-New to MidiMesh? Read the [**MidiMesh User Manual**](https://claude.ai/code/artifact/36bac59f-2281-4daa-abd9-7512aa271b64) — a complete, plain-language walkthrough for live-production volunteers: setting up nodes and mesh security, routing MIDI, translation tables, the HTTP / OSC / RossTalk gateways, monitoring & troubleshooting, and scenes & backups.
+New to MidiMesh? Read the [**MidiMesh User Manual**](https://shakes63.github.io/midimesh-releases/) — a complete, plain-language walkthrough for live-production volunteers: setting up nodes and mesh security, routing MIDI, translation tables, the HTTP / OSC / RossTalk gateways, monitoring & troubleshooting, and scenes & backups.
